@@ -75,7 +75,7 @@ fi
 if [[ "$LATEST_KERNEL" == "$RUNNING_KERNEL" ]]; then
     # we are running the latest kernel
     if [[ -n "$VERBOSE" ]]; then
-        echo "$(hostname -f) $RUNNING_KERNEL in the latest installed kernel"
+        echo "$(hostname -f) $RUNNING_KERNEL is the latest installed kernel"
     fi
     exit 0
 fi
