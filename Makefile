@@ -1,5 +1,4 @@
-#!/bin/make
-# @(#)Makefile	1.2 04 May 1995 02:06:57
+#!/usr/bin/env make
 #
 # kup2date - determine if the kernel is up to date
 #
@@ -28,11 +27,11 @@
 # Share and enjoy! :-)
 
 
-SHELL= /bin/bash
+SHELL= bash
 
 INSTALL= install
 
-DESTDIR= /usr/global/sbin
+DESTDIR= /usr/local/sbin
 
 TARGETS= kup2date
 
