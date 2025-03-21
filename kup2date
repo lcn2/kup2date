@@ -2,7 +2,7 @@
 #
 # kup2date - determine if the kernel is up to date
 #
-# Copyright (c) 2016,2023 by Landon Curt Noll.  All Rights Reserved.
+# Copyright (c) 2016,2023,2025 by Landon Curt Noll.  All Rights Reserved.
 #
 # Permission to use, copy, modify, and distribute this software and
 # its documentation for any purpose and without fee is hereby granted,
@@ -22,62 +22,185 @@
 # OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
 # PERFORMANCE OF THIS SOFTWARE.
 #
-# chongo (Landon Curt Noll, http://www.isthe.com/chongo/index.html) /\oo/\
+# chongo (Landon Curt Noll) /\oo/\
 #
-# Share and enjoy! :-)
+# http://www.isthe.com/chongo/index.html
+# https://github.com/lcn2
+#
+# Share and enjoy!  :-)
 
-# parse args
+
+# setup
 #
-export VERBOSE=
-export USAGE="usage: $0 [-v] [-h]"
-while getopts vh flag; do
-    case "$flag" in
-    v) VERBOSE=true; ;;
-    *) echo $USAGE 1>&2
-       exit 2 ;;
-    esac
+export VERSION="1.0 2025-03-20"
+NAME=$(basename "$0")
+export NAME
+#
+export V_FLAG=0
+#
+export DO_NOT_PROCESS=
+RPMSORT=$(type -P rpmsort)
+export RPMSORT
+RPMSORT="${RPMSORT:=/usr/lib/rpm/redhat/rpmsort}"
+
+
+# usage
+#
+export USAGE="usage: $0 [-h] [-v level] [-V] [-N] [-r rpmsort]
+
+    -h          print help message and exit
+    -v level    set verbosity level (def level: $V_FLAG)
+    -V          print version string and exit
+
+    -N          do not process anything, just parse arguments (def: process something)
+
+    -r rpmsort	path to the rpmsort tool (def: $RPMSORT}
+
+Exit codes:
+     0         all OK
+     1         some internal tool exited non-zero
+     2         -h and help string printed or -V and version string printed
+     3         command line error
+     4	       cannot find rpmsort tool
+     5	       cannot determine the latest installed kernel version
+     6	       determine the version of the running kernel
+ >= 10         internal error
+
+$NAME version: $VERSION"
+
+
+# parse command line
+#
+while getopts :hv:VNr: flag; do
+  case "$flag" in
+    h) echo "$USAGE"
+	exit 2
+	;;
+    v) V_FLAG="$OPTARG"
+	;;
+    V) echo "$VERSION"
+	exit 2
+	;;
+    N) DO_NOT_PROCESS="-N"
+	;;
+    r) RPMSORT="$OPTARG"
+	;;
+    \?) echo "$0: ERROR: invalid option: -$OPTARG" 1>&2
+	echo 1>&2
+	echo "$USAGE" 1>&2
+	exit 3
+	;;
+    :) echo "$0: ERROR: option -$OPTARG requires an argument" 1>&2
+	echo 1>&2
+	echo "$USAGE" 1>&2
+	exit 3
+	;;
+    *) echo "$0: ERROR: unexpected value from getopts: $flag" 1>&2
+	echo 1>&2
+	echo "$USAGE" 1>&2
+	exit 3
+	;;
+  esac
 done
+if [[ $V_FLAG -ge 1 ]]; then
+    echo "$0: debug[1]: debug level: $V_FLAG" 1>&2
+fi
+#
+# remove the options
+#
 shift $(( OPTIND - 1 ));
+#
+# verify arg count
+#
 if [[ $# -ne 0 ]]; then
-    echo "$0: FATAL: unexpected argments" 1>&2
-    echo $USAGE 1>&2
+    echo "$0: ERROR: expected 0 args, found: $#" 1>&2
+    echo "$USAGE" 1>&2
     exit 3
 fi
 
-# firewall
+
+# firewall - must have rpmsort
 #
-export RPMSORT="/usr/lib/rpm/redhat/rpmsort"
 if [[ ! -x "$RPMSORT" ]]; then
-    echo "$0: FATAL: cannot find rpmsort executable: $RPMSORT" 1>&2
-    echo "$0: NOTICE: The redhat-rpm-config package contains $RPMSORT" 1>&2
-    echo "$0: NOTICE: try: yum install redhat-rpm-config" 1>&2
+    echo "$0: ERROR: cannot find rpmsort executable: $RPMSORT" 1>&2
+    echo "$0: notice: The redhat-rpm-config package contains $RPMSORT" 1>&2
+    echo "$0: notice: try: dnf install redhat-rpm-config" 1>&2
     exit 4
 fi
 
-# determine the latest installed kernel
+
+# print running info if verbose
 #
-export LATEST_KERNEL=$(rpm -q kernel 2>/dev/null | "$RPMSORT" 2>/dev/null | tail -1)
-if [[ -z "$LATEST_KERNEL" ]]; then
-    echo "$0: FATAL: count not determine the latest installed kernel" 1>&2
-    exit 5
+# If -v 3 or higher, print exported variables in order that they were exported.
+#
+if [[ $V_FLAG -ge 3 ]]; then
+    echo "$0: debug[3]: VERSION=$VERSION" 1>&2
+    echo "$0: debug[3]: NAME=$NAME" 1>&2
+    echo "$0: debug[3]: V_FLAG=$V_FLAG" 1>&2
+    echo "$0: debug[3]: DO_NOT_PROCESS=$DO_NOT_PROCESS" 1>&2
+    echo "$0: debug[3]: RPMSORT=$RPMSORT" 1>&2
 fi
 
-# determine the running kernel
-#
-export RUNNING_KERNEL="kernel-"$(uname -r 2>/dev/null)
-if [[ -z "$RUNNING_KERNEL" ]]; then
-    echo "$0: FATAL: count not determine running kernel" 1>&2
-    exit 6
-fi
 
-# report if the kernel is up to date
+# -N stops early before any processing is performed
 #
-if [[ "$LATEST_KERNEL" == "$RUNNING_KERNEL" ]]; then
-    # we are running the latest kernel
-    if [[ -n "$VERBOSE" ]]; then
-        echo "$(hostname -f) $RUNNING_KERNEL is the latest installed kernel"
+if [[ -n $DO_NOT_PROCESS ]]; then
+    if [[ $V_FLAG -ge 3 ]]; then
+	echo "$0: debug[3]: arguments parsed, -N given, exiting 0" 1>&2
     fi
     exit 0
 fi
-echo "$(hostname -f) $RUNNING_KERNEL is not the latest installed kernel $LATEST_KERNEL"
-exit 1
+
+
+# determine the latest installed kernel
+#
+LATEST_KERNEL=$(rpm -q kernel 2>/dev/null | "$RPMSORT" 2>/dev/null | tail -1)
+export LATEST_KERNEL
+if [[ -z "$LATEST_KERNEL" ]]; then
+    echo "$0: ERROR: count not determine the latest installed kernel version" 1>&2
+    exit 5
+fi
+if [[ $V_FLAG -ge 1 ]]; then
+    echo "$0: debug[1]: latest installed kernel version: $LATEST_KERNEL" 1>&2
+fi
+
+
+# determine the running kernel
+#
+RUNNING_KERNEL="kernel-"$(uname -r 2>/dev/null)
+export RUNNING_KERNEL
+if [[ -z "$RUNNING_KERNEL" ]]; then
+    echo "$0: ERROR: count not determine the version of the running kernel" 1>&2
+    exit 6
+fi
+if [[ $V_FLAG -ge 1 ]]; then
+    echo "$0: debug[1]: version of the running kernel: $RUNNING_KERNEL" 1>&2
+fi
+
+
+# report if the kernel is up to date
+#
+OUR_HOST="$(hostname -f)"
+export OUR_HOST="${OUR_HOST:=locqlhost}"
+export EXIT_CODE=0
+if [[ "$LATEST_KERNEL" != "$RUNNING_KERNEL" ]]; then
+    echo "$0: Warning: $OUR_HOST is not running the latest installed kernel $LATEST_KERNEL"
+    EXIT_CODE=1
+else
+    # we are running the latest kernel
+    if [[ $V_FLAG -ge 1 ]]; then
+        echo "$0: $OUR_HOST is running the latest installed kernel: $RUNNING_KERNEL"
+    fi
+fi
+
+
+# All Done!!! All Done!!! -- Jessica Noll, Age 2
+#
+if [[ $V_FLAG -ge 1 ]]; then
+    if [[ $EXIT_CODE -ne 0 ]]; then
+	echo "$0: Warning: about to exit non-zero: $EXIT_CODE" 1>&2
+    else
+	echo "$0: debug[1]: about to exit $EXIT_CODE" 1>&2
+    fi
+fi
+exit "$EXIT_CODE"
