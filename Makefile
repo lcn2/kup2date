@@ -2,7 +2,7 @@
 #
 # kup2date - determine if the kernel is up to date
 #
-# Copyright (c) 2016,2025 by Landon Curt Noll.  All Rights Reserved.
+# Copyright (c) 2016,2018,2023,2025 by Landon Curt Noll.  All Rights Reserved.
 #
 # Permission to use, copy, modify, and distribute this software and
 # its documentation for any purpose and without fee is hereby granted,
