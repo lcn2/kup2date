@@ -26,4 +26,4 @@ If all is well, the command will print nothing.  However, if you wish the comman
 
 # Reporting Security Issues
 
-To report a security issue, please visit "[Reporting Security Issues](https://github.com/lcn2/kupdate/security/policy)".
+To report a security issue, please visit "[Reporting Security Issues](https://github.com/lcn2/kup2date/security/policy)".
